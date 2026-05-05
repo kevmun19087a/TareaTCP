@@ -16,6 +16,15 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class Servidor {
     private final Map<String, List<String>> registros = new ConcurrentHashMap<>();
+    private final String[] tiposPermitidos = new String[]{"Entrada","Salida al Almuerzo","Entrada del Almuerzo","Salida"};
+
+    private boolean esTipoValido(String tipo) {
+        if (tipo == null) return false;
+        for (String t : tiposPermitidos) {
+            if (t.equalsIgnoreCase(tipo)) return true;
+        }
+        return false;
+    }
 
     public static String obtenerFecha() {
         Date fecha = new Date();
@@ -38,20 +47,35 @@ public class Servidor {
                     OutputStream output = cliente.getOutputStream();
 
                     DataInputStream dataInput = new DataInputStream(input);
-                    String nombreCliente = dataInput.readUTF();
-                    System.out.println("Mensaje recibido de: " + nombreCliente);
+                    String recibido = dataInput.readUTF();
+                    System.out.println("Mensaje recibido: " + recibido);
 
-                    String timestamp = Servidor.obtenerFecha();
+                    String[] partes = recibido.split("\\|", 2);
+                    String nombreCliente = partes.length >= 1 ? partes[0].trim() : "";
+                    String tipo = partes.length == 2 ? partes[1].trim() : "";
 
-                    List<String> lista = registros.computeIfAbsent(nombreCliente, k -> new ArrayList<>());
                     String respuesta;
-                    synchronized (lista) {
-                        if (lista.size() >= 4) {
-                            respuesta = "ERROR;MAX_REACHED;Ya se registraron 4 timbres";
-                        } else {
-                            lista.add(timestamp);
-                            int index = lista.size();
-                            respuesta = "OK;" + index + ";" + timestamp;
+
+                    if (nombreCliente.isEmpty() || !nombreCliente.matches("[A-Za-zÁÉÍÓÚáéíóúÑñ\\s]+")) {
+                        respuesta = "ERROR;NOMBRE_INVALIDO;Nombre inválido. Solo letras y espacios permitidos";
+                    } else if (!esTipoValido(tipo)) {
+                        respuesta = "ERROR;TIPO_INVALIDO;Tipo inválido. Use uno de: Entrada, Salida al Almuerzo, Entrada del Almuerzo, Salida";
+                    } else {
+                        String timestamp = Servidor.obtenerFecha();
+                        List<String> lista = registros.computeIfAbsent(nombreCliente, k -> new ArrayList<>());
+                        synchronized (lista) {
+                            if (lista.size() >= 4) {
+                                respuesta = "ERROR;MAXIMO_ALCANZADO;Ya se registraron 4 timbres";
+                            } else {
+                                String expected = tiposPermitidos[lista.size()];
+                                if (!expected.equalsIgnoreCase(tipo)) {
+                                    respuesta = "ERROR;ORDEN_INVALIDA;Timbre inválido. Siguiente timbre esperado: " + expected;
+                                } else {
+                                    lista.add(tipo + ";" + timestamp);
+                                    int index = lista.size();
+                                    respuesta = "OK;" + index + ";" + timestamp + ";" + tipo;
+                                }
+                            }
                         }
                     }
 
@@ -59,12 +83,12 @@ public class Servidor {
                     dataOutput.writeUTF(respuesta);
 
                     cliente.close();
-                } catch (Exception e) {
+                    } catch (Exception e) {
                     System.err.println("Error manejando cliente: " + e.getMessage());
                     try {
                         cliente.close();
                     } catch (Exception ex) {
-                        // ignorar
+                        
                     }
                 }
             }).start();

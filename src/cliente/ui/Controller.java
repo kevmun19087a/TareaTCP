@@ -4,6 +4,7 @@ import cliente.Cliente;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
@@ -12,6 +13,9 @@ import javafx.scene.control.TextField;
 public class Controller {
     @FXML
     private TextField nameField;
+
+    @FXML
+    private ComboBox<String> typeBox;
 
     @FXML
     private Button timbreButton;
@@ -27,25 +31,31 @@ public class Controller {
     @FXML
     private void initialize() {
         statusLabel.setText("");
+        typeBox.getItems().addAll("Entrada", "Salida al Almuerzo", "Entrada del Almuerzo", "Salida");
+        typeBox.getSelectionModel().selectFirst();
     }
 
     @FXML
     private void onTimbre() {
         String nombre = nameField.getText();
+        String tipo = typeBox.getValue();
         if (nombre == null || nombre.trim().isEmpty()) {
             statusLabel.setText("Ingrese un nombre");
+            return;
+        }
+        if (tipo == null || tipo.trim().isEmpty()) {
+            statusLabel.setText("Seleccione un tipo de timbre");
             return;
         }
 
         timbreButton.setDisable(true);
         statusLabel.setText("Registrando...");
 
-        // Ejecutar la comunicación en un hilo de fondo
         Task<Void> task = new Task<Void>() {
             @Override
             protected Void call() throws Exception {
-                try {
-                    String respuesta = cliente.enviar(nombre.trim());
+                    try {
+                    String respuesta = cliente.enviar(nombre.trim(), tipo.trim());
                     Platform.runLater(() -> procesarRespuesta(respuesta));
                 } catch (Exception e) {
                     Platform.runLater(() -> statusLabel.setText("Error: " + e.getMessage()));
@@ -66,12 +76,12 @@ public class Controller {
         }
 
         if (respuesta.startsWith("OK;")) {
-            // OK;index;timestamp
-            String[] parts = respuesta.split(";", 3);
-            if (parts.length >= 3) {
+            String[] parts = respuesta.split(";", 4);
+            if (parts.length >= 4) {
                 String index = parts[1];
                 String timestamp = parts[2];
-                listView.getItems().add(index + ". " + timestamp);
+                String tipo = parts[3];
+                listView.getItems().add(index + ". [" + tipo + "] " + timestamp);
                 statusLabel.setText("Timbre registrado (#" + index + ")");
                 if ("4".equals(index)) {
                     statusLabel.setText("Se registraron los 4 timbres");

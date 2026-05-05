@@ -13,7 +13,11 @@ public class TestCliente{
         Scanner sc = new Scanner(System.in);
         nombre = sc.nextLine();
 
+        System.out.println("Seleccione tipo (escribir exactamente): Entrada, Salida al Almuerzo, Entrada del Almuerzo, Salida");
+        String tipo = sc.nextLine();
+
         Cliente cliente = new Cliente();
-        cliente.enviar(nombre);
+        String resp = cliente.enviar(nombre, tipo);
+        System.out.println("Respuesta servidor: " + resp);
     }
 }
